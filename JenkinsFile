@@ -1,0 +1,78 @@
+pipeline {
+    agent any
+
+    environment {
+        AWS_REGION = 'ap-south-1'
+        IMAGE_NAME = 'rest-api'
+    }
+
+    stages {
+        stage('Checkout Code') {
+            steps {
+                git branch: 'main', url: 'https://github.com/sharmayash08/rest-api-devops-project'
+            }
+        }
+
+        stage('Build Docker Image') {
+            steps {
+                script {
+                    sh 'docker build -t $IMAGE_NAME .'
+                }
+            }
+        }
+
+        stage('Push Docker Image') {
+            steps {
+                script {
+                    withDockerRegistry([credentialsId: 'docker-hub-credentials-id', url: '']) {
+                        def imageTag = "${env.BUILD_NUMBER}"
+                        sh "docker tag $IMAGE_NAME yash280876/$IMAGE_NAME:$imageTag"
+                        sh "docker push yash280876/$IMAGE_NAME:$imageTag"
+                    }
+                }
+            }
+        }
+
+        stage('Provision Infrastructure') {
+            steps {
+                script {
+                    withCredentials([[$class: 'AmazonWebServicesCredentialsBinding', credentialsId: 'aws-credentials-id']]) {
+                        sh 'cd terraform && terraform init'
+                        sh 'cd terraform && terraform validate'
+                        sh 'cd terraform && terraform apply -auto-approve'
+                    }
+                }
+            }
+        }
+
+        stage('Deploy Application') {
+            steps {
+                script {
+                    withCredentials([[$class: 'AmazonWebServicesCredentialsBinding', credentialsId: 'aws-credentials-id']]) {
+                        echo 'Restarting EC2 instance...'
+                        sh '''
+                        INSTANCE_ID=$(aws ec2 describe-instances --filters "Name=tag:Name,Values=rest-api-instance" --query "Reservations[].Instances[].InstanceId" --output text --region $AWS_REGION)
+                        if [ -z "$INSTANCE_ID" ]; then
+                            echo "Error: No instance found with the specified tag."
+                            exit 1
+                        fi
+                        aws ec2 reboot-instances --instance-ids $INSTANCE_ID --region $AWS_REGION
+                        '''
+                    }
+                }
+            }
+        }
+    }
+
+    post {
+        always {
+            echo 'Pipeline finished.'
+        }
+        success {
+            echo 'Deployment was successful!'
+        }
+        failure {
+            echo 'Deployment failed.'
+        }
+    }
+}
