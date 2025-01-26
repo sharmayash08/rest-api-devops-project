@@ -14,6 +14,10 @@ app.get("/" , (req , res) => {
     res.send("Welcome to REST API!");
 })
 
+app.get("/user" , (req , res) => {
+    res.send("Welcome to Huluuu!");
+})
+
 app.listen(PORT , () => {
     console.log(`Server is running on port ${PORT}`);
 })
