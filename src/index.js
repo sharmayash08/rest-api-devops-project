@@ -15,7 +15,7 @@ app.get("/" , (req , res) => {
 })
 
 app.get("/user" , (req , res) => {
-    res.send("Welcome to Huluuu!");
+    res.send("Welcome to Hululu!");
 })
 
 app.listen(PORT , () => {
